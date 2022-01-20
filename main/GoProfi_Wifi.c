@@ -29,6 +29,11 @@
 #define ESP_WIFI_CHANNEL 1
 #define ESP_MAX_STA_CONN 2
 
+#define PART_BOUNDARY "123456789000000000000987654321"
+static const char* _STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
+static const char* _STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
+static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+
 /* Empty handle to esp_http_server */
 static httpd_handle_t server = NULL;
 static struct tm time_st;
@@ -98,6 +103,10 @@ void Wifi_main()
 {
 	if( esp_wifi_start() == ESP_OK )
 	{
+		// debug
+		ESP_LOGI(LOG, "Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+		ESP_LOGI(LOG, "Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
 		start_webserver();
 		ESP_LOGI(LOG, "WIFI STARTED");
 	}
@@ -206,7 +215,7 @@ int get_flist(httpd_req_t *req)
     }
 
     memset(buf, 0, buf_size);
-    sprintf(buf, "<html><h4>Current File List</h4><table border=1> <tr><td>No</td><td>File_Name</td><td>Download</td><td>Delete</td><td>File_Size</td><td>Time</td></tr>");
+    sprintf(buf, "<html><h4>Current File List</h4><table border=1> <tr><td>No</td><td>File_Name</td><td>Download</td><td>Play</td><td>Delete</td><td>File_Size</td></tr>");
     httpd_resp_send_chunk(req, buf, buf_size);
     memset(buf, 0, buf_size);
 
@@ -233,7 +242,7 @@ int get_flist(httpd_req_t *req)
       			sprintf(buf, "<tr><td>%d</td><td>%s</td><td><a href = \"http://192.168.4.1/flist?file=%s&mode=down\" download=\"%s\">Download</a></td>", f_count, dir->d_name, dir->d_name, dir->d_name);
       			httpd_resp_send_chunk(req, buf, buf_size);
       			memset(buf, 0, buf_size);
-      			sprintf(buf, "<td><a href = \"http://192.168.4.1/flist?file=%s&mode=dele\">Delete</a></td><td>%lu kb</td><td>0 s</td></tr>", dir->d_name, f_info_size);
+      			sprintf(buf, "<td><a href = \"http://192.168.4.1/play?file=%s\">Play</a></td><td><a href = \"http://192.168.4.1/flist?file=%s&mode=dele\">Delete</a></td><td>%lu kb</td></tr>", dir->d_name, dir->d_name, f_info_size);
         		httpd_resp_send_chunk(req, buf, buf_size);
         		memset(buf, 0, buf_size);
         		ESP_LOGI(LOG,"%s", dir->d_name);
@@ -390,6 +399,140 @@ int get_config(httpd_req_t *req)
     return 0;
 }
 
+int get_play(httpd_req_t *req)
+{
+    size_t qur_len;
+    char *qur;
+
+    qur_len = httpd_req_get_url_query_len(req) + 1;
+
+    char file_name[100];
+    char buf[SCRATCH_BUFSIZE];
+    size_t buf_size;
+    size_t meta_size;
+    char frameNo_c[9];
+    char fileSize_c[9];
+    int frameNo = 0;
+    int fileSize = 0;
+    int remainSize = 0;
+
+    FILE* f;
+    FILE* f_meta;
+
+    memset(buf,0,SCRATCH_BUFSIZE);
+
+    if (qur_len > 1)
+    {
+     	qur = malloc(qur_len);
+  		if (httpd_req_get_url_query_str(req, qur, qur_len) == ESP_OK)
+  		{
+  			ESP_LOGI(LOG,"Query received %s", qur);
+
+  			if( httpd_query_key_value(qur, "file", file_name, sizeof(file_name)) == ESP_OK )
+  			{
+  				sprintf(buf, "/sdcard/%s", file_name);
+  				f = fopen(buf, "r");
+  				memset(buf,0,SCRATCH_BUFSIZE);
+
+  				int i = 0;
+  				int found = 0;
+  				do
+  				{
+  					if( file_name[i] == '.' ) found = 1;
+
+  					if(found >= 1)
+  					{
+  						switch(found)
+  						{
+							case 1 :
+								file_name[i] = '_';
+								break;
+							case 2 :
+								file_name[i] = 'm';
+								break;
+							case 3 :
+								file_name[i] = '.';
+								break;
+							case 4 :
+								file_name[i] = 't';
+								break;
+							case 5 :
+								file_name[i] = 'x';
+								break;
+							case 6 :
+								file_name[i] = 't';
+								break;
+							default :
+								break;
+  						}
+  						found = found+1;
+  					}
+  					i++;
+  				}while(found<=6);
+
+  				sprintf(buf, "/sdcard/%s", file_name);
+  				ESP_LOGI(LOG, "META : %s", file_name);
+  				f_meta = fopen(buf,"r");
+  				if (f_meta != NULL) ESP_LOGI(LOG,"SUCCESSFUL!");
+  				memset(buf,0,SCRATCH_BUFSIZE);
+
+  				httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
+  				ESP_LOGI(LOG, "FILE OPENED");
+
+  				sprintf(buf,"<html><a href=\"http://192.168.4.1/flist\">FILE_LIST</a>");
+  				httpd_resp_send_chunk(req, buf, SCRATCH_BUFSIZE);
+  				memset(buf,0,SCRATCH_BUFSIZE);
+
+  				while(fread(frameNo_c, 1, 8, f_meta) > 0)
+  				{
+					fread(fileSize_c, 1, 8, f_meta);
+					fseek(f_meta,16,SEEK_CUR);
+
+					frameNo = charToInt(frameNo_c, 8);
+					fileSize = charToInt(fileSize_c, 8);
+
+					ESP_LOGI(LOG, "String - frmaeNo : %s, fileSize : %s", frameNo_c, fileSize_c);
+					ESP_LOGI(LOG, "INT - frmaeNo : %d, fileSize : %d", frameNo, fileSize);
+
+		            size_t hlen = snprintf((char *)buf, SCRATCH_BUFSIZE, _STREAM_PART, fileSize);
+		            httpd_resp_send_chunk(req, (const char *)buf, hlen);
+		            memset(buf,0,SCRATCH_BUFSIZE);
+
+		            remainSize = fileSize;
+					do
+					{
+						if ( remainSize < SCRATCH_BUFSIZE )
+						{
+							buf_size = fread(buf, 1, remainSize, f);
+						}
+						else
+						{
+							buf_size = fread(buf, 1, SCRATCH_BUFSIZE, f);
+						}
+						httpd_resp_send_chunk(req, buf, buf_size);
+						memset(buf,0,SCRATCH_BUFSIZE);
+						remainSize = remainSize - buf_size;
+					}while(remainSize > 0);
+					httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+  				};
+
+
+  				/*
+  				do
+  				{
+  					buf_size = fread(buf, 1, SCRATCH_BUFSIZE, f);
+  					httpd_resp_send_chunk(req, buf, buf_size);
+  				}
+  				while( buf_size >= 0 );
+  				*/
+  	  	  	    fclose(f);
+  	  	  	    fclose(f_meta);
+  			}
+  		}
+    }
+	return 0;
+}
+
 httpd_uri_t uri_flist = {
 		.uri	= "/flist",
 		.method = HTTP_GET,
@@ -404,6 +547,13 @@ httpd_uri_t uri_config = {
 		.user_ctx = NULL
 };
 
+httpd_uri_t uri_play = {
+		.uri	= "/play",
+		.method = HTTP_GET,
+		.handler = get_play,
+		.user_ctx = NULL
+};
+
 
 /*
  * WEB Server main part
@@ -415,6 +565,7 @@ int start_webserver()
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_register_uri_handler(server, &uri_flist);
         httpd_register_uri_handler(server, &uri_config);
+        httpd_register_uri_handler(server, &uri_play);
         ESP_LOGI(LOG,"WEBI STARTED_SUCCESS");
         return 1;
     }
@@ -441,8 +592,6 @@ int charToInt(char *buf, int limit)
 	for ( int i = 0 ; i < limit ; i++ )
 	{
 		ret_val = ret_val + ( buf[i] - '0' ) * pow( (double)10, ( limit - i - 1 ) );
-		ESP_LOGI(LOG, " 10 ^ ( limit - i - 1 ) Val : %d",  10 ^ ( limit - i - 1 ) );
-		ESP_LOGI(LOG, "limit : %d, i : %d", limit, i);
 	}
 	ESP_LOGI(LOG, "BufVal : %d", ret_val);
 	return ret_val;

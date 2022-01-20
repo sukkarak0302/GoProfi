@@ -17,7 +17,7 @@
 #define LOG "Button"
 
 gpio_config_t button_config = {
-		.pin_bit_mask = GPIO_SEL_16,
+		.pin_bit_mask = GPIO_SEL_13,
 		.mode = GPIO_MODE_INPUT,
 		.pull_up_en = GPIO_PULLUP_DISABLE,
 		.pull_down_en = GPIO_PULLDOWN_ENABLE,
@@ -30,7 +30,7 @@ extern int Button_Change = 2;
 
 int button_init()
 {
-	if( gpio_config(&button_config) == ESP_OK && gpio_set_pull_mode(GPIO_NUM_16, GPIO_PULLDOWN_ONLY) == ESP_OK )
+	if( gpio_config(&button_config) == ESP_OK && gpio_set_pull_mode(GPIO_NUM_13, GPIO_PULLDOWN_ONLY) == ESP_OK )
 		return ESP_OK;
 	else
 		return 1;
@@ -42,7 +42,7 @@ void button_main()
 
 	for( ; ; )
 	{
-		level = gpio_get_level(GPIO_NUM_16);
+		level = gpio_get_level(GPIO_NUM_13);
 
 		if( level != level_pre && level == 0 )
 			Button_Change = 1;
