@@ -36,8 +36,11 @@ static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 
 /* Empty handle to esp_http_server */
 static httpd_handle_t server = NULL;
+static httpd_handle_t server_control = NULL;
 static struct tm time_st;
 static time_t time_t_val;
+
+extern int State_Request = 2;
 
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                     int32_t event_id, void* event_data)
@@ -94,22 +97,34 @@ int Wifi_init()
 	if( esp_wifi_set_mode(WIFI_MODE_AP) == ESP_OK && esp_wifi_set_config(WIFI_IF_AP, &wf_config) == ESP_OK )
 	{
 		ESP_LOGI(LOG, "Entered");
-		return 0;
+		if ( esp_wifi_start() == ESP_OK ) return 0;
+		else return 1;
 	}
 	return 1;
 }
 
+void Wifi_control_main()
+{
+	start_control_server();
+	ESP_LOGI(LOG, "WIFI CONTROL MAIN");
+
+	for ( ; ; )
+	{
+
+	}
+}
+
 void Wifi_main()
 {
-	if( esp_wifi_start() == ESP_OK )
-	{
+	//if( esp_wifi_start() == ESP_OK )
+	//{
 		// debug
 		ESP_LOGI(LOG, "Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 		ESP_LOGI(LOG, "Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
 		start_webserver();
 		ESP_LOGI(LOG, "WIFI STARTED");
-	}
+	//}
 
 	for ( ; ; )
 	{
@@ -129,6 +144,106 @@ int Wifi_stop()
 			}
 		}
 	}
+	return 0;
+}
+
+int get_control(httpd_req_t *req)
+{
+	char buf[SCRATCH_BUFSIZE];
+	size_t buf_size = sizeof(buf);
+
+	char control[5];
+	size_t control_size = sizeof(control);
+
+	size_t qur_len;
+	char *qur;
+
+	FILE *fp;
+
+	memset(buf,0,buf_size);
+
+	ESP_LOGI(LOG, "BEFORE READ");
+	int Main_State = State_Read();
+	/*
+	if ( Main_State == 2 )
+	{
+		sprintf(buf, "<script>function Func_initVal(){ \
+		    		  document.getElementById(\"Status\").innerHTML = \"Not recording\";</script>");
+	}
+	else if ( Main_State == 3 )
+	{
+		sprintf(buf, "<script>function Func_initVal(){ \
+		    		  document.getElementById(\"Status\").innerHTML = \"Recording\";</script>");
+	}
+	else
+	{
+		sprintf(buf, "<script>function Func_initVal(){ \
+		    		  document.getElementById(\"Status\").innerHTML = \"ERROR\";</script>");
+	}
+
+	httpd_resp_send_chunk(req, buf, buf_size);
+	memset(buf,0,buf_size);
+*/
+	memset(buf,0,buf_size);
+	sprintf(buf,"<html>\
+				<h1>CONTROL & CONFIG PAGE</h1>\
+				STATUS : %d <a href=\"http://192.168.4.1/control\">UPDATE</a>\
+				<br>CONTROL : \
+				<br><a href=\"http://192.168.4.1/control?req=rec\">RECORD</a>\
+				<br><a href=\"http://192.168.4.1/control?req=stop\">STOP_RECORD</a>\
+				<br>\
+				<br><a href=\"http://192.168.4.1/config\">CONFIG</a>\
+				<br><a href=\"http://192.168.4.1/flist\">FILE MANAGER</a>\
+				</html>", Main_State);
+	httpd_resp_send_chunk(req, buf, buf_size);
+	httpd_resp_send_chunk(req, NULL, buf_size);
+
+	/*
+	ESP_LOGI(LOG, "BEFORE OPEN FILE");
+
+	fp = fopen("\sdcard\system\control.html","r");
+	if ( fp != NULL )
+	{
+		do
+		{
+			memset(buf,0,buf_size);
+			buf_size = fread(buf, 1, SCRATCH_BUFSIZE, fp);
+			if (buf_size > 0)
+			{
+				if(httpd_resp_send_chunk(req, buf, buf_size) != ESP_OK)
+				{
+					fclose(fp);
+				}
+			}
+		}while (buf_size != 0);
+		fclose(fp);
+	}
+*/
+	ESP_LOGI(LOG, "FILE_SEND DONE");
+
+	qur_len = httpd_req_get_url_query_len(req) + 1;
+	if (qur_len >1)
+	{
+		ESP_LOGI(LOG, "QUR EXIST");
+		qur = malloc(qur_len);
+		if (httpd_req_get_url_query_str(req, qur, qur_len) == ESP_OK)
+		{
+			ESP_LOGI(LOG, "QUR GET");
+   			if ( httpd_query_key_value(qur, "req", control, sizeof(control)) == ESP_OK )
+   			{
+   				ESP_LOGI(LOG, "key value : %s",qur);
+   				if ( strcmp(control,"rec") == 0 )
+   				{
+   					State_Write((int)(3));
+   				}
+   				else if ( strcmp(control, "stop") == 0 )
+   				{
+   					State_Write((int)(2));
+   				}
+   			}
+		}
+	}
+
 	return 0;
 }
 
@@ -533,6 +648,13 @@ int get_play(httpd_req_t *req)
 	return 0;
 }
 
+httpd_uri_t uri_control = {
+		.uri	= "/control",
+		.method = HTTP_GET,
+		.handler = get_control,
+		.user_ctx = NULL
+};
+
 httpd_uri_t uri_flist = {
 		.uri	= "/flist",
 		.method = HTTP_GET,
@@ -558,6 +680,44 @@ httpd_uri_t uri_play = {
 /*
  * WEB Server main part
  */
+
+int start_control_server()
+{
+	httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+	if ( httpd_start(&server, &config) == ESP_OK )
+	{
+		httpd_register_uri_handler(server, &uri_control);
+		ESP_LOGI(LOG, "CONTROL SERVER STARTED");
+		//if (httpd_start(&server, &config) == ESP_OK)
+		//{
+		        httpd_register_uri_handler(server, &uri_flist);
+		        httpd_register_uri_handler(server, &uri_config);
+		        httpd_register_uri_handler(server, &uri_play);
+		        ESP_LOGI(LOG,"WEBI STARTED_SUCCESS");
+		        return 1;
+		//}
+		//else
+		//{
+		//	ESP_LOGI(LOG,"WEBI STARTED_FAILED");
+		//}
+	}
+
+	ESP_LOGI(LOG, "CONTROL SERVER FAILED");
+
+	return 0;
+}
+
+int stop_control_server()
+{
+	if(server_control != NULL)
+	{
+		if( httpd_stop(server_control) == ESP_OK )
+			return 1;
+	}
+	return 0;
+}
+
 int start_webserver()
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -643,6 +803,20 @@ void get_sys_configValue(sys_config_struct* val)
 	val->sys_quality = get_cam_config_quality();
 	val->sys_vflip = 0;
 	val->sys_hflip = 0;
+}
+
+/*
+ * State setter function
+ */
+void State_Write(int val)
+{
+	State_Request = val;
+	ESP_LOGI(LOG, "STATE SET : %d", State);
+}
+
+int State_Read()
+{
+	return State_Request;
 }
 
 

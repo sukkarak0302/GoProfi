@@ -29,14 +29,13 @@
 
 #include "GoProfi_Camera.h"
 #include "GoProfi_Wifi.h"
-#include "GoProfi_Button.h"
 #include "MainParameter.h"
 
 void mainRoutine();
 
 bool Initialize();
 
-static int State = 0;
+extern int State = 0;
 
 static const char *TAG = "Main";
 
@@ -51,7 +50,6 @@ void app_main(void)
 	{
 		ESP_LOGV(TAG, "Initialize!!!");
 		main_State = xTaskCreate( mainRoutine, "mainRoutine", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &main_Handle );
-		//mainRoutine();
 		ESP_LOGV(TAG, "DONE");
 	}
 }
@@ -61,16 +59,15 @@ void mainRoutine()
     BaseType_t camera_State;
     TaskHandle_t camera_Handle = NULL;
 
-    BaseType_t button_State;
-    TaskHandle_t button_Handle = NULL;
-
-    BaseType_t wifi_State;
+    BaseType_t wifi_State = 1;
     TaskHandle_t wifi_Handle = NULL;
 
-    StaticTask_t xTaskBuffer;
-    StackType_t *xStack;
+    BaseType_t wifi_Control_State;
+    TaskHandle_t wifi_Control_Handle = NULL;
 
-    button_State = xTaskCreate( button_main, "button_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &button_Handle );
+    vTaskDelay(100);
+
+    //
 
     int check = 0;
 	int cam_check = 0;
@@ -78,13 +75,16 @@ void mainRoutine()
 
 	for( ; ; )
 	{
-		if ( ( Button_Change == 1 || State == 0 ) )
+		if ( ( State != State_Read() || State == 0 ) )
 		{
-			if ( State == 0 ) State = 2;
-			else if ( State == 3 ) State = 2;
-			else if ( State == 2 ) State = 3;
+			if ( State == 0 && wifi_Control_Handle == NULL)
+			{
+				State = 2;
+				wifi_Control_State = xTaskCreate( Wifi_control_main, "wifi_control_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Control_Handle );
+			}
+			else if ( State != State_Request ) State = State_Request;
 
-			ESP_LOGI(TAG, "Button : %d, State : %d", Button_Change, State);
+			ESP_LOGI(TAG, "State Req : %d, State : %d", State_Request, State);
 
 			switch (State)
 			{
@@ -98,9 +98,8 @@ void mainRoutine()
 						vTaskDelay(100);
 						ESP_LOGI(TAG, "Task delay!");
 						camera_Handle = NULL;
-						camera_fileclose();
-						ESP_LOGI(TAG, "Cam task deleted");
-						cam_check = 1;
+						cam_check = camera_fileclose();
+						ESP_LOGI(TAG, "Cam task deleted, fname check %d", cam_check);
 					}
 					else
 					{
@@ -109,7 +108,8 @@ void mainRoutine()
 
 					if ( wifi_Handle == NULL )
 					{
-						wifi_State = xTaskCreate( Wifi_main, "wifi_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Handle );
+						//wifi_State = xTaskCreate( Wifi_main, "wifi_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Handle );
+						//wifi_State = xTaskCreate( wifi_control_main, "wifi_control_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Handle );
 						ESP_LOGI(TAG, "WIFI_STATUS : %d", wifi_State);
 						wifi_check = 1;
 					}
@@ -166,6 +166,7 @@ void mainRoutine()
 		}
 		vTaskDelay(20);
 	}
+
 }
 
 
@@ -201,7 +202,9 @@ bool Initialize()
 	// debug
 	ESP_LOGI(TAG, "3Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 	ESP_LOGI(TAG, "3Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-	status_ind[2] = button_init();
+	//status_ind[2] = button_init();
+
+	status_ind[2] = 0;
 
 	ESP_LOGI(TAG,"Initialization Status : %d , %d, %d", status_ind[0], status_ind[1], status_ind[2] );
 	if ( status_ind[0] + status_ind[1] + status_ind[2] == 0 ) { status = true; };

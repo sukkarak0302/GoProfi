@@ -95,11 +95,11 @@ static camera_config_t camera_config = {
     .ledc_channel = LEDC_CHANNEL_0,
 
     .pixel_format = PIXFORMAT_JPEG,//YUV422,GRAYSCALE,RGB565,JPEG
-    .frame_size = FRAMESIZE_XGA,//FRAMESIZE_QVGA,//FRAMESIZE_SXGA,//FRAMESIZE_SVGA,//FRAMESIZE_SVGA 12,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
+    .frame_size = FRAMESIZE_SVGA,//FRAMESIZE_QVGA,//FRAMESIZE_SXGA,//FRAMESIZE_SVGA,//FRAMESIZE_SVGA 12,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
 
     .jpeg_quality = 12, //0-63 lower number means higher quality
     .fb_count = 1, //if more than one, i2s runs in continuous mode. Use only with JPEG
-	.fb_location = CAMERA_FB_IN_PSRAM,
+	.fb_location = CAMERA_FB_IN_DRAM,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY //. Sets when buffers should be filled
 };
 
@@ -226,7 +226,7 @@ esp_err_t init_sd()
 #else
         .format_if_mount_failed = false,
 #endif // EXAMPLE_FORMAT_IF_MOUNT_FAILED
-        .max_files = 2,
+        .max_files = 4,
         .allocation_unit_size = 16*1024
     };
 

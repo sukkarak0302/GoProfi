@@ -9,8 +9,8 @@
 #define MAIN_MAINPARAMETER_H_
 
 // Button GPIO
-#define BUTTON_INPUT_PIN 13 // Button GPIO16
-#define BUTTON_INPUT_PIN_SEL (1ULL<<BUTTON_INPUT_PIN)
+//#define BUTTON_INPUT_PIN 13 // Button GPIO16
+//#define BUTTON_INPUT_PIN_SEL (1ULL<<BUTTON_INPUT_PIN)
 
 #define STACK_SIZE 8096
 
@@ -18,5 +18,7 @@
 
 #define ESP_WIFI_SSID "GO_PROFI"
 #define ESP_WIFI_PASS "12345678"
+
+extern int State;
 
 #endif /* MAIN_MAINPARAMETER_H_ */
