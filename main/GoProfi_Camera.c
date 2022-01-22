@@ -68,7 +68,6 @@ static FILE *f_meta = NULL;
 extern unsigned int tot_kb = 0;
 extern unsigned int free_kb = 0;
 
-static int can_close = 0;
 static int f_close_complete = 0;
 
 static camera_config_t camera_config = {
@@ -90,14 +89,14 @@ static camera_config_t camera_config = {
     .pin_href = CAM_PIN_HREF,
     .pin_pclk = CAM_PIN_PCLK,
 
-    .xclk_freq_hz = 16000000,//EXPERIMENTAL: Set to 16MHz on ESP32-S2 or ESP32-S3 to enable EDMA mode
+    .xclk_freq_hz = 16000000,
     .ledc_timer = LEDC_TIMER_0,
     .ledc_channel = LEDC_CHANNEL_0,
 
     .pixel_format = PIXFORMAT_JPEG,//YUV422,GRAYSCALE,RGB565,JPEG
     .frame_size = FRAMESIZE_SVGA,//FRAMESIZE_QVGA,//FRAMESIZE_SXGA,//FRAMESIZE_SVGA,//FRAMESIZE_SVGA 12,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
 
-    .jpeg_quality = 12, //0-63 lower number means higher quality
+    .jpeg_quality = 5, //0-63 lower number means higher quality
     .fb_count = 1, //if more than one, i2s runs in continuous mode. Use only with JPEG
 	.fb_location = CAMERA_FB_IN_DRAM,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY //. Sets when buffers should be filled
@@ -109,22 +108,20 @@ static camera_config_t camera_config = {
  */
 esp_err_t camera_init()
 {
-    //initialize the camera
-    esp_err_t err_cam = esp_camera_init(&camera_config);
-	esp_err_t err_sd = init_sd();
+    int ret_val = 0;
 
-    if (err_cam != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Camera Init Failed");
-        return err_cam;
-    }
-    if (err_sd != ESP_OK)
-    {
-        ESP_LOGE(TAG, "SD Failed");
-        return err_sd;
-    }
-    ESP_LOGI(TAG, "Initialize Successful!");
-    return ESP_OK;
+    if (esp_camera_init(&camera_config) != ESP_OK)
+    	ret_val++;
+
+    if (init_sd() != ESP_OK)
+    	ret_val++;
+
+#ifdef DEBUG
+    if (ret_val == 0) ESP_LOGI(TAG, "camera init successful");
+    ESP_LOGE(TAG, "camera init - ret_val : %d", ret_val);
+#endif
+
+    return ret_val;
 }
 
 void camera_capture_task()
@@ -134,78 +131,106 @@ void camera_capture_task()
 	char write_buf[9];
 	char write_tot_buf[33];
 
+	int ret_val = 0;
+
 	ms_0 = clock();
 
 	while( 1 )
 	{
+		ret_val = 0;
 		ms_start = clock();
-		if( camera_capture()==1 )
+		if( f_close_complete >= 1 )
 		{
-			//File No
-			ESP_LOGI(TAG, "BEFORE");
-			intToChar_ret(cur_frame,8,write_buf);
-			for(int i = 0 ; i < 8 ; i++) write_tot_buf[i] = write_buf[i];
-			memset(write_buf, 0, 9);
-
-			//File Size
-			intToChar_ret(fb->len,8,write_buf);
-			for(int i = 8 ; i < 16 ; i++) write_tot_buf[i] = write_buf[i-8];
-			memset(write_buf, 0, 9);
-
-			//ms
-			intToChar_ret((ms_start-ms_0),8,write_buf);
-			for(int i = 16 ; i < 24 ; i++) write_tot_buf[i] = write_buf[i-16];
-			memset(write_buf, 0, 9);
-
-			intToChar_ret(0,6,write_buf);
-			for(int i = 24 ; i < 30 ; i++) write_tot_buf[i] = '0';
-			write_tot_buf[30] = 0x0D;
-			write_tot_buf[31] = 0x0A;
-			ESP_LOGI(TAG,"%s", write_tot_buf);
-
-			can_close = 0;
-			if( f != NULL && f_close_complete == 0 )
-			{
-				if( fwrite(fb->buf, fb->len, 1, f) != 1 )
-					ESP_LOGI(TAG, "CAM_WRITE ERROR!");
-				else
-					ESP_LOGI(TAG,"frame %d!", cur_frame);
-			}
-
-			if( f_meta != NULL && f_close_complete == 0 )
-			{
-				if( fwrite(write_tot_buf, 32, 1, f_meta) != 1 )
-					ESP_LOGI(TAG, "File_different!");
-				else
-					ESP_LOGI(TAG, "Meta_successful!");
-			}
-			memset(write_buf, 0, 9);
-			memset(write_tot_buf, 0, 32);
-			can_close = 1;
+			//File closing state
 		}
 		else
 		{
-			ESP_LOGE(TAG,"frame error : %d!", cur_frame);
+			if ( camera_capture()==1 )
+			{
+				//File No
+				intToChar_ret(cur_frame,8,write_buf);
+				for(int i = 0 ; i < 8 ; i++) write_tot_buf[i] = write_buf[i];
+				memset(write_buf, 0, 9);
+
+				//File Size
+				intToChar_ret(fb->len,8,write_buf);
+				for(int i = 8 ; i < 16 ; i++) write_tot_buf[i] = write_buf[i-8];
+				memset(write_buf, 0, 9);
+
+				//ms
+				intToChar_ret((ms_start-ms_0),8,write_buf);
+				for(int i = 16 ; i < 24 ; i++) write_tot_buf[i] = write_buf[i-16];
+				memset(write_buf, 0, 9);
+
+				intToChar_ret(0,6,write_buf);
+				for(int i = 24 ; i < 30 ; i++) write_tot_buf[i] = '0';
+				write_tot_buf[30] = 0x0D;
+				write_tot_buf[31] = 0x0A;
+
+				if( f != NULL && f_close_complete == 0 )
+				{
+					if( fwrite(fb->buf, fb->len, 1, f) != 1 )
+						ret_val = 3;
+					else
+						ret_val = 1;
+				}
+
+				if( f_meta != NULL && f_close_complete == 0 )
+				{
+					if( fwrite(write_tot_buf, 32, 1, f_meta) != 1 )
+						ret_val = ret_val + 5;
+					else
+						ret_val = ret_val + 1;
+				}
+				memset(write_buf, 0, 9);
+				memset(write_tot_buf, 0, 32);
+
+				ms_end = clock();
+
+				cur_frame++;
+			}
+			esp_camera_fb_return(fb);
+
+#ifdef DEBUG
+	if (ret_val == 4)
+		ESP_LOGE(TAG,"mjpeg inconsistence");
+	else if (ret_val == 6)
+		ESP_LOGE(TAG,"meta file inconsistence");
+	else if (ret_val == 8)
+		ESP_LOGE(TAG,"mjpeg & meta file inconsistence");
+	else if (ret_val == 0)
+		ESP_LOGE(TAG, "Capture failure!");
+	else
+	{
+		ESP_LOGI(TAG,"LOG File save : %s", write_tot_buf);
+		ESP_LOGI(TAG,"frame %d!", cur_frame);
+		ESP_LOGI(TAG, "fps : %f", 1/((double)(ms_end-ms_start)/1000));
+	}
+#endif
+
 		}
-
-		cur_frame++;
-		esp_camera_fb_return(fb);
-		ms_end = clock();
-		ESP_LOGE(TAG, "fps : %f", 1/((double)(ms_end-ms_start)/1000));
-
 		vTaskDelay(pic_delay_ms);
 	}
 }
 
-int camera_capture(){
+int camera_capture()
+{
+	esp_err_t ret_val;
+
     fb = esp_camera_fb_get();
 
-    if (!fb) {
-        ESP_LOGE(TAG, "Camera Capture Failed");
-        return 0;
-    }
+    if (!fb)
+    	ret_val = ESP_FAIL;
+    else
+    	ret_val = 1;
 
-    return 1;
+#ifdef DEBUG
+    if ( ret_val == ESP_FAIL ) ESP_LOGE(TAG, "Cam capture failed");
+    else ESP_LOGI(TAG, "Cam capture success");
+    ESP_LOGI(TAG, "camera_capture : %d", ret_val);
+#endif
+
+    return ret_val;
 }
 
 
@@ -214,7 +239,7 @@ int camera_capture(){
  */
 esp_err_t init_sd()
 {
-	esp_err_t ret;
+	esp_err_t ret_val;
 
     // Options for mounting the filesystem.
     // If format_if_mount_failed is set to true, SD card will be partitioned and
@@ -231,14 +256,11 @@ esp_err_t init_sd()
     };
 
     const char mount_point[] = MOUNT_POINT;
-    ESP_LOGI(TAG, "Initializing SD card");
 
     // Use settings defined above to initialize SD card and mount FAT filesystem.
     // Note: esp_vfs_fat_sdmmc/sdspi_mount is all-in-one convenience functions.
     // Please check its source code and implement error recovery when developing
     // production applications.
-
-    ESP_LOGI(TAG, "Using SDMMC peripheral");
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
 
     // This initializes the slot without card detect (CD) and write protect (WP) signals.
@@ -264,20 +286,18 @@ esp_err_t init_sd()
     // connected on the bus. This is for debug / example purpose only.
     //slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
-    ESP_LOGI(TAG, "Mounting filesystem");
-    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    ret_val = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
 
-    if (ret != ESP_OK) {
-        if (ret == ESP_FAIL) {
+    if (ret_val != ESP_OK) {
+        if (ret_val == ESP_FAIL) {
             ESP_LOGE(TAG, "Failed to mount filesystem. "
                      "If you want the card to be formatted, set the EXAMPLE_FORMAT_IF_MOUNT_FAILED menuconfig option.");
         } else {
             ESP_LOGE(TAG, "Failed to initialize the card (%s). "
-                     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret));
+                     "Make sure SD card lines have pull-up resistors in place.", esp_err_to_name(ret_val));
         }
-        return ret;
+        return ret_val;
     }
-    ESP_LOGI(TAG, "Filesystem mounted");
 
     // Card has been initialized, print its properties
     sdmmc_card_print_info(stdout, card);
@@ -294,23 +314,26 @@ esp_err_t init_sd()
     tot_kb = tot_sect * fs->ssize / 1024;
     free_kb = fre_sect * fs->ssize / 1024;
 
+#ifdef DEBUG
     ESP_LOGI(TAG, "%d KiB total drive space.\n%d KiB available.\n", tot_kb, free_kb);
+    ESP_LOGI(TAG, "init_sd ret_val : %d", ret_val);
+#endif
 
-    return ret;
+    return ret_val;
 }
 
 int sd_unmount()
 {
+	int ret_val = 0;
     if( esp_vfs_fat_sdcard_unmount(MOUNT_POINT, card) == ESP_OK )
-    {
-    	ESP_LOGI(TAG, "Card unmounted");
-    	return 1;
-    }
-    else
-    {
-    	ESP_LOGI(TAG, "Card unmounted unsuccessful!");
-    	return 0;
-    }
+    	ret_val = 1;
+
+#ifdef DEBUG
+    if (ret_val == 1) ESP_LOGI(TAG, "SD unmount successful");
+    else ESP_LOGE(TAG, "SD unmount unsuccessful!");
+#endif
+
+    return ret_val;
 }
 
 
@@ -322,34 +345,26 @@ int camera_filegen()
 	char file_path[MAX_FILE_NAME_LENGTH];
 	char file_path_meta[MAX_FILE_NAME_LENGTH];
 
-	//DEBUG
-	ESP_LOGI(TAG, "Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-	ESP_LOGI(TAG, "Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+	int ret_val = 0;
 
 	filename_gen(file_path);
-	ESP_LOGE(TAG, "Fname : %s", file_path);
-
-	ESP_LOGE(TAG,"Camera main started-before!");
 	f = fopen(file_path, "w");
-	if (f == NULL)
-	{
-	    ESP_LOGE(TAG, "Failed to open file for writing");
-	    return 0;
-	}
 
 	filename_gen_meta(file_path_meta);
 	f_meta = fopen(file_path_meta, "w");
 
-	if (f_meta == NULL)
+	if ( (f != NULL) && (f_meta != NULL) )
 	{
-	    ESP_LOGE(TAG, "Failed to open file for writing");
-	    return 0;
+		ret_val = 1;
+		f_close_complete = 0;
 	}
 
-	f_close_complete = 0;
-	ESP_LOGI(TAG, "File Opened!");
+#ifdef DEBUG
+	ESP_LOGI(TAG, "Camera_filegen Fname : %s", file_path);
+	if(ret_val == 0) ESP_LOGE(TAG, "camera_filegen - Failed to open file for writing");
+#endif
 
-	return 1;
+	return ret_val;
 }
 
 void filename_gen(char* f_name)
@@ -358,13 +373,21 @@ void filename_gen(char* f_name)
 	current_time = localtime(&raw_time);
 
 	sprintf(f_name, "/sdcard/M%d_%d_%d_%d-%d-%d.mjpeg", current_time->tm_year+1900, current_time->tm_mon+1, current_time->tm_mday, current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
-	ESP_LOGI(TAG, "%s",f_name);
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "filename_gen : %s",f_name);
+#endif
+
 }
 
 void filename_gen_meta(char* f_name)
 {
 	sprintf(f_name, "/sdcard/M%d_%d_%d_%d-%d-%d_m.txt", current_time->tm_year+1900, current_time->tm_mon+1, current_time->tm_mday, current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
-	ESP_LOGI(TAG, "%s",f_name);
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "filename_gen_meta : %s",f_name);
+#endif
+
 }
 
 
@@ -372,48 +395,43 @@ int camera_fileclose()
 {
 	esp_camera_fb_return(fb);
 	int trial = 0;
+	int ret_val = 0;
 
-	while(1)
+	while(trial < 3)
 	{
 		trial++;
 		if( f != NULL )
 		{
-			ESP_LOGE(TAG, "F != NULL");
-
 			if( fclose(f) == 0 )
 			{
-				ESP_LOGE(TAG, "file close successful. cam");
 				f = NULL;
 			}
 		}
 
 		if( f_meta != NULL )
 		{
-			ESP_LOGE(TAG, "f_meta != NULL");
-
 			if( fclose(f_meta) == 0 )
 			{
-				ESP_LOGE(TAG, "file close successful. meta");
 				f_meta = NULL;
 			}
 		}
 
 		if ( ( f == NULL && f_meta == NULL ) )
 		{
-			ESP_LOGE(TAG, "Both file closed");
-			return 1;
-		}
-
-		if ( trial > 3 )
-		{
-			ESP_LOGE(TAG, "Trial limit over");
-			return 0;
+			f_close_complete = 1;
+			ret_val = 1;
 		}
 	}
 
-	f_close_complete = 1;
-	ESP_LOGE(TAG, "File close failed");
-	return 0;
+#ifdef DEBUG
+	if ( f != NULL ) ESP_LOGE(TAG, "MJPEG file close failed.");
+	if ( f_meta != NULL ) ESP_LOGE(TAG, "meta file close failed.");
+	if ( ret_val == 1 ) ESP_LOGE(TAG, "Both file closed");
+	else if ( ret_val == 0 ) ESP_LOGE(TAG, "File close failed");
+	if ( trial >= 3 ) ESP_LOGE(TAG, "Trial limit over.");
+#endif
+
+	return ret_val;
 }
 
 
@@ -422,9 +440,11 @@ int camera_fileclose()
  */
 int cam_config_size(int val)
 {
+	framesize_t pic_size;
+	framesize_t ret_val = 0;
+
 	if( esp_camera_deinit() == ESP_OK )
 	{
-		framesize_t pic_size;
 		switch (val)
 		{
 			case 1:
@@ -450,75 +470,99 @@ int cam_config_size(int val)
 		}
 		camera_config.frame_size = pic_size;
 		if ( esp_camera_init(&camera_config) == ESP_OK )
-		{
-			return pic_size;
-		}
+			ret_val = pic_size;
 		else
 		{
 			camera_config.frame_size = FRAMESIZE_QVGA;
 			if ( esp_camera_deinit() == ESP_OK )
 			{
 				if ( esp_camera_init(&camera_config) == ESP_OK )
-					return FRAMESIZE_QVGA;
+					ret_val = FRAMESIZE_QVGA;
 			}
 		}
 	}
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "cam_config_size - ret_val : %d", ret_val);
+#endif
+
 	return 0;
 }
 
 int cam_config_fps(int val)
 {
 	pic_delay_ms = (int)(1000/val);
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "cam_config_fps : pic_delay_ms %d", pic_delay_ms);
+#endif
+
 	return 1;
 }
 
 int cam_config_quality(int val)
 {
+	int ret_val = 0;
 	if( esp_camera_deinit() == ESP_OK )
 	{
 		camera_config.jpeg_quality = val;
 		if ( esp_camera_init(&camera_config) == ESP_OK )
-		{
-			return 1;
-		}
-		else
-		{
-			return 0;
-		}
+			ret_val = 1;
 	}
-	else
-		return 0;
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "cam_config_quality - ret_val : %d", ret_val);
+#endif
+
+	return ret_val;
 }
 
 int get_cam_config_fps()
 {
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "get_cam_config_fps : %d", (int)(1000/pic_delay_ms) );
+#endif
+
 	return (int)(1000/pic_delay_ms);
 }
 
 int get_cam_config_quality()
 {
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "get_cam_config_quality : %d", camera_config.jpeg_quality);
+#endif
+
 	return camera_config.jpeg_quality;
 }
 
 int get_cam_config_size()
 {
+	int ret_val = 1;
 	switch (camera_config.frame_size)
 	{
 		case 5 :
-			return 1;
+			ret_val = 1;
 		case 8 :
-			return 2;
+			ret_val = 2;
 		case 9 :
-			return 3;
+			ret_val = 3;
 		case 10 :
-			return 4;
+			ret_val = 4;
 		case 12 :
-			return 5;
+			ret_val = 5;
 		case 13 :
-			return 6;
+			ret_val = 6;
 		default :
-			return 1;
+			ret_val = 1;
 	}
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "get_cam_config_size : %d", ret_val);
+#endif
+
+	return ret_val;
 }
 
 /*
