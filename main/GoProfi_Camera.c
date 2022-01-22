@@ -188,12 +188,12 @@ void camera_capture_task()
 			ESP_LOGE(TAG,"frame error : %d!", cur_frame);
 		}
 
-	cur_frame++;
-	esp_camera_fb_return(fb);
-	ms_end = clock();
-	ESP_LOGE(TAG, "fps : %f", 1/((double)(ms_end-ms_start)/1000));
+		cur_frame++;
+		esp_camera_fb_return(fb);
+		ms_end = clock();
+		ESP_LOGE(TAG, "fps : %f", 1/((double)(ms_end-ms_start)/1000));
 
-	vTaskDelay(pic_delay_ms);
+		vTaskDelay(pic_delay_ms);
 	}
 }
 

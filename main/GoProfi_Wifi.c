@@ -116,15 +116,12 @@ void Wifi_control_main()
 
 void Wifi_main()
 {
-	//if( esp_wifi_start() == ESP_OK )
-	//{
-		// debug
-		ESP_LOGI(LOG, "Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
-		ESP_LOGI(LOG, "Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+	// DEBUG
+	ESP_LOGI(LOG, "Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+	ESP_LOGI(LOG, "Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
-		start_webserver();
-		ESP_LOGI(LOG, "WIFI STARTED");
-	//}
+	start_webserver();
+	ESP_LOGI(LOG, "WIFI STARTED");
 
 	for ( ; ; )
 	{
@@ -164,26 +161,7 @@ int get_control(httpd_req_t *req)
 
 	ESP_LOGI(LOG, "BEFORE READ");
 	int Main_State = State_Read();
-	/*
-	if ( Main_State == 2 )
-	{
-		sprintf(buf, "<script>function Func_initVal(){ \
-		    		  document.getElementById(\"Status\").innerHTML = \"Not recording\";</script>");
-	}
-	else if ( Main_State == 3 )
-	{
-		sprintf(buf, "<script>function Func_initVal(){ \
-		    		  document.getElementById(\"Status\").innerHTML = \"Recording\";</script>");
-	}
-	else
-	{
-		sprintf(buf, "<script>function Func_initVal(){ \
-		    		  document.getElementById(\"Status\").innerHTML = \"ERROR\";</script>");
-	}
 
-	httpd_resp_send_chunk(req, buf, buf_size);
-	memset(buf,0,buf_size);
-*/
 	memset(buf,0,buf_size);
 	sprintf(buf,"<html>\
 				<h1>CONTROL & CONFIG PAGE</h1>\
@@ -196,29 +174,8 @@ int get_control(httpd_req_t *req)
 				<br><a href=\"http://192.168.4.1/flist\">FILE MANAGER</a>\
 				</html>", Main_State);
 	httpd_resp_send_chunk(req, buf, buf_size);
-	httpd_resp_send_chunk(req, NULL, buf_size);
+	httpd_resp_send_chunk(req, NULL, 0);
 
-	/*
-	ESP_LOGI(LOG, "BEFORE OPEN FILE");
-
-	fp = fopen("\sdcard\system\control.html","r");
-	if ( fp != NULL )
-	{
-		do
-		{
-			memset(buf,0,buf_size);
-			buf_size = fread(buf, 1, SCRATCH_BUFSIZE, fp);
-			if (buf_size > 0)
-			{
-				if(httpd_resp_send_chunk(req, buf, buf_size) != ESP_OK)
-				{
-					fclose(fp);
-				}
-			}
-		}while (buf_size != 0);
-		fclose(fp);
-	}
-*/
 	ESP_LOGI(LOG, "FILE_SEND DONE");
 
 	qur_len = httpd_req_get_url_query_len(req) + 1;

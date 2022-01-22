@@ -67,8 +67,6 @@ void mainRoutine()
 
     vTaskDelay(100);
 
-    //
-
     int check = 0;
 	int cam_check = 0;
 	int wifi_check = 0;
@@ -108,8 +106,6 @@ void mainRoutine()
 
 					if ( wifi_Handle == NULL )
 					{
-						//wifi_State = xTaskCreate( Wifi_main, "wifi_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Handle );
-						//wifi_State = xTaskCreate( wifi_control_main, "wifi_control_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Handle );
 						ESP_LOGI(TAG, "WIFI_STATUS : %d", wifi_State);
 						wifi_check = 1;
 					}
@@ -140,10 +136,7 @@ void mainRoutine()
 
 					if( camera_filegen() == 1 && camera_Handle == NULL )
 					{
-						//xStack = (uint8_t*)heap_caps_calloc(1, 10*1024, MALLOC_CAP_SPIRAM);
-						//camera_State = xTaskCreateStatic( camera_capture_task, "camera_main", 10*1024, ( void * ) 1, tskIDLE_PRIORITY, xStack, &xTaskBuffer );
 						camera_State = xTaskCreate( camera_capture_task, "camera_main", STACK_SIZE, ( void * ) 1, ( UBaseType_t ) 1U, &camera_Handle );
-						//camera_capture_task();
 						cam_check = 1;
 					}
 
@@ -176,8 +169,7 @@ void mainRoutine()
 bool Initialize()
 {
 	bool status=false;
-	int status_ind[3] = {1,1,1};
-
+	int status_ind[2] = {1,1};
 
 	ESP_LOGI(TAG, "Largest Free block SPIRAM : %d", heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
 	ESP_LOGI(TAG, "Largest Free block INTERNAL : %d", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
@@ -196,18 +188,12 @@ bool Initialize()
 	ESP_LOGI(TAG, "2Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 	status_ind[0] = camera_init();
 
-	//TEMP
-	status_ind[0] = 0;
-
 	// debug
 	ESP_LOGI(TAG, "3Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
 	ESP_LOGI(TAG, "3Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-	//status_ind[2] = button_init();
 
-	status_ind[2] = 0;
-
-	ESP_LOGI(TAG,"Initialization Status : %d , %d, %d", status_ind[0], status_ind[1], status_ind[2] );
-	if ( status_ind[0] + status_ind[1] + status_ind[2] == 0 ) { status = true; };
+	ESP_LOGI(TAG,"Initialization Status : %d , %d, %d", status_ind[0], status_ind[1] );
+	if ( status_ind[0] + status_ind[1] == 0 ) { status = true; };
 
 	return status;
 }
