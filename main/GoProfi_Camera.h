@@ -19,7 +19,8 @@ int sd_unmount();
 
 int camera_filegen();
 void filename_gen(char*);
-void camera_fileclose();
+void filename_gen_meta(char*);
+int camera_fileclose();
 
 int cam_config_fps(int);
 int cam_config_quality(int);
@@ -30,5 +31,7 @@ int get_cam_config_quality();
 
 extern unsigned int tot_kb;
 extern unsigned int free_kb;
+
+void intToChar_ret(int, int, char*);
 
 #endif /* MAIN_GOPROFI_CAMERA_H_ */

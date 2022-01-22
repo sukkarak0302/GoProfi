@@ -29,15 +29,13 @@
 
 #include "GoProfi_Camera.h"
 #include "GoProfi_Wifi.h"
-#include "GoProfi_Button.h"
 #include "MainParameter.h"
 
 void mainRoutine();
 
 bool Initialize();
 
-static int State = 2;
-static int Initial_Run = 1;
+extern int State = 0;
 
 static const char *TAG = "Main";
 
@@ -61,44 +59,67 @@ void mainRoutine()
     BaseType_t camera_State;
     TaskHandle_t camera_Handle = NULL;
 
-    BaseType_t button_State;
-    TaskHandle_t button_Handle = NULL;
-
-    BaseType_t wifi_State;
+    BaseType_t wifi_State = 1;
     TaskHandle_t wifi_Handle = NULL;
 
-    button_State = xTaskCreate( button_main, "button_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &button_Handle );
+    BaseType_t wifi_Control_State;
+    TaskHandle_t wifi_Control_Handle = NULL;
+
+    vTaskDelay(100);
+
+    int check = 0;
+	int cam_check = 0;
+	int wifi_check = 0;
 
 	for( ; ; )
 	{
-		if ( ( Button_Change == 1 && Initial_Run == 0 ) || Initial_Run == 1 )
+		if ( ( State != State_Read() || State == 0 ) )
 		{
-			if ( Initial_Run == 0 )
+			if ( State == 0 && wifi_Control_Handle == NULL)
 			{
-				if ( State == 2 ) State = 3;
-				else if ( State == 3 ) State = 2;
+				State = 2;
+				wifi_Control_State = xTaskCreate( Wifi_control_main, "wifi_control_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Control_Handle );
 			}
-			ESP_LOGI(TAG, "Button : %d, State : %d", Button_Change, State);
-			Initial_Run = 0;
+			else if ( State != State_Request ) State = State_Request;
+
+			ESP_LOGI(TAG, "State Req : %d, State : %d", State_Request, State);
 
 			switch (State)
 			{
 				case 2 :
+					cam_check = 0;
+					wifi_check = 0;
 					if( camera_Handle != NULL )
 					{
-						camera_fileclose();
 						vTaskDelete( camera_Handle );
+						ESP_LOGI(TAG, "CamHandle deleted1");
+						vTaskDelay(100);
+						ESP_LOGI(TAG, "Task delay!");
 						camera_Handle = NULL;
-						ESP_LOGI(TAG, "Cam task deleted");
+						cam_check = camera_fileclose();
+						ESP_LOGI(TAG, "Cam task deleted, fname check %d", cam_check);
 					}
+					else
+					{
+						cam_check = 1;
+					}
+
 					if ( wifi_Handle == NULL )
 					{
-						wifi_State = xTaskCreate( Wifi_main, "wifi_main", STACK_SIZE, ( void * ) 1, tskIDLE_PRIORITY, &wifi_Handle );
 						ESP_LOGI(TAG, "WIFI_STATUS : %d", wifi_State);
+						wifi_check = 1;
 					}
+
+					if ( ( cam_check == 0 || wifi_check == 0 ) )
+					{
+						State = 4;
+					}
+
 					break;
 
 				case 3 :
+					cam_check = 0;
+					wifi_check = 0;
 					ESP_LOGI(TAG, "Cam Started");
 					if( wifi_Handle != NULL )
 					{
@@ -106,10 +127,24 @@ void mainRoutine()
 						vTaskDelete( wifi_Handle );
 						wifi_Handle = NULL;
 						ESP_LOGI(TAG, "Wifi task deleted. status : %d", wifi_status);
+						wifi_check = 1;
 					}
-					if( camera_filegen() && camera_Handle == NULL )
+					else
+					{
+						wifi_check = 1;
+					}
+
+					if( camera_filegen() == 1 && camera_Handle == NULL )
 					{
 						camera_State = xTaskCreate( camera_capture_task, "camera_main", STACK_SIZE, ( void * ) 1, ( UBaseType_t ) 1U, &camera_Handle );
+						cam_check = 1;
+					}
+
+					if ( cam_check == 0 || wifi_check == 0 )
+					{
+						State = 4;
+						ESP_LOGI(TAG, "ERROR to State 4");
+						esp_restart();
 					}
 					break;
 
@@ -124,6 +159,7 @@ void mainRoutine()
 		}
 		vTaskDelay(20);
 	}
+
 }
 
 
@@ -133,14 +169,31 @@ void mainRoutine()
 bool Initialize()
 {
 	bool status=false;
-	int status_ind[3] = {1,1,1};
+	int status_ind[2] = {1,1};
+
+	ESP_LOGI(TAG, "Largest Free block SPIRAM : %d", heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+	ESP_LOGI(TAG, "Largest Free block INTERNAL : %d", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+
+	// debug
+	ESP_LOGI(TAG, "1Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+	ESP_LOGI(TAG, "1Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
 
 	status_ind[1] = Wifi_init();
-	status_ind[0] = camera_init();
-	status_ind[2] = button_init();
 
-	ESP_LOGI(TAG,"Initialization Status : %d , %d, %d", status_ind[0], status_ind[1], status_ind[2] );
-	if ( status_ind[0] + status_ind[1] + status_ind[2] == 0 ) { status = true; };
+	ESP_LOGI(TAG, "Largest Free block SPIRAM : %d", heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+	ESP_LOGI(TAG, "Largest Free block INTERNAL : %d", heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+
+	// debug
+	ESP_LOGI(TAG, "2Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+	ESP_LOGI(TAG, "2Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+	status_ind[0] = camera_init();
+
+	// debug
+	ESP_LOGI(TAG, "3Free size SPIRAM : %d", heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+	ESP_LOGI(TAG, "3Free size INTERNAL : %d", heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
+	ESP_LOGI(TAG,"Initialization Status : %d , %d, %d", status_ind[0], status_ind[1] );
+	if ( status_ind[0] + status_ind[1] == 0 ) { status = true; };
 
 	return status;
 }

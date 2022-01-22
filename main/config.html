@@ -1,0 +1,185 @@
+<script>
+var xhttp = new XMLHttpRequest();
+var url = location.href;
+var val_time;
+var val_yyyy = 2000;
+var val_mo = 01;
+var val_dd = 01;
+var val_hh = 01;
+var val_mi = 01;
+var val_fps = 15;
+var val_vflip = 1;
+var val_hflip = 1;
+var tot_url;
+
+
+
+function Func_year(){
+  val_yyyy = document.getElementById("year").value;
+  document.getElementById("val_year").innerHTML = val_yyyy;
+}
+
+function Func_month(){
+  val_mo = document.getElementById("month").value;
+  document.getElementById("val_month").innerHTML = val_mo;
+}
+
+function Func_day(){
+  val_dd = document.getElementById("day").value;
+  document.getElementById("val_day").innerHTML = val_dd;
+}
+
+function Func_hour(){
+  val_hh = document.getElementById("hour").value;
+  document.getElementById("val_hour").innerHTML = val_hh;
+}
+
+function Func_minute(){
+  val_mi = document.getElementById("minute").value;
+  document.getElementById("val_minute").innerHTML = val_mi;
+}
+
+function Func_timeConfirm(){
+  val_time = 0;
+  var xhttp = new XMLHttpRequest();
+  
+  if ( val_mo < 10 ){
+	val_time = val_yyyy + "0" + val_mo;
+  }
+  else{
+	val_time = val_yyyy + val_mo;
+  }
+  
+  if ( val_dd < 10 ){
+	val_time = val_time + "0" + val_dd;
+  }
+  else{
+	val_time = val_time + val_dd;
+  }
+  
+  if ( val_hh < 10 ){
+	val_time = val_time + "0" + val_hh;
+  }
+  else{
+	val_time = val_time + val_hh;
+  }
+  
+  if ( val_mi< 10 ){
+	val_time = val_time + "0" + val_mi;
+  }
+  else{
+	val_time = val_time + val_mi;
+  }
+  
+  var url2 = url + "?time=" + val_time;
+  xhttp.open("GET", url2, true);
+  xhttp.send();
+  
+}
+
+function Func_size(){
+  var xhttp = new XMLHttpRequest();
+  var val_size = document.getElementById("frame_size").value;
+  
+  var url2 = url + "?size=" + val_size;
+  xhttp.open("GET", url2, true);
+  xhttp.send(); 
+}
+
+function Func_fps(){
+  var xhttp = new XMLHttpRequest();
+  val_fps = document.getElementById("fps").value;
+  document.getElementById("val_fps").innerHTML = val_fps;
+  
+  var url2 = url + "?fps=" + val_fps;
+  xhttp.open("GET", url2, true);
+  xhttp.send(); 
+}
+
+function Func_vflip(){
+  var xhttp = new XMLHttpRequest();
+  val_vflip = document.getElementById("vflip").value;
+  document.getElementById("val_vflip").innerHTML = val_vflip;
+  
+  var url2 = url + "?vflip=" + val_vflip;
+  xhttp.open("GET", url2, true);
+  xhttp.send(); 
+}
+
+function Func_hflip(){
+  var xhttp = new XMLHttpRequest();
+  val_hflip = document.getElementById("hflip").value;
+  document.getElementById("val_hflip").innerHTML = val_hflip;
+  
+  var url2 = url + "?hflip=" + val_hflip;
+  xhttp.open("GET", url2, true);
+  xhttp.send(); 
+}
+
+function Func_quality(){
+  var xhttp = new XMLHttpRequest();
+  val_quality = document.getElementById("quality").value;
+  document.getElementById("val_quality").innerHTML = val_quality;
+  
+  var url2 = url + "?quality=" + val_quality;
+  xhttp.open("GET", url2, true);
+  xhttp.send(); 	
+}
+  
+</script>
+
+
+<html>
+<body onload="Func_initVal()">
+<h3>GO_PROFI</h3>
+<h4>Configuration</h4>
+<table border=1>
+<tr><td>Config Name</td><td>System Value</td><td>Value</td></tr>
+<tr><td>TIME</td><td><span id="sys_time1"></span> . <span id="sys_time2"></span></td><td><div class="slidecontainer">Y : 
+  <input type="range" min="2020" max="2040" value="2020" class="slider" id="year" oninput="Func_year()">
+</div>
+<div class="slidecontainer">M : 
+  <input type="range" min="1" max="12" value="1" class="slider" id="month" oninput="Func_month()">
+</div>
+<div class="slidecontainer">D : 
+  <input type="range" min="1" max="31" value="1" class="slider" id="day" oninput="Func_day()">
+</div>
+<div class="slidecontainer">H : 
+  <input type="range" min="0" max="23" value="0" class="slider" id="hour" oninput="Func_hour()">
+</div>
+<div class="slidecontainer">m : 
+  <input type="range" min="0" max="59" value="0" class="slider" id="minute" oninput="Func_minute()">
+</div>
+Result : <span id="val_year"></span>.<span id="val_month"></span>.<span id="val_day"></span>/<span id="val_hour"></span>:<span id="val_minute"></span>
+<br>
+<button type="button" onclick="Func_timeConfirm()">CONFIRM</button>
+</td></tr>
+<tr><td>SIZE</td><td><span id="sys_size"></span></td><td><select name="frame_size" id="frame_size" oninput="Func_size()">
+    <option value="1">QVGA(320X240)</option>
+  <option value="2">VGA(640X480)</option>
+  <option value="3">SVGA(800X600)</option>
+</select></td></tr>
+
+<tr><td>FPS</td><td><span id="sys_fps"></span></td><td><div class="slidecontainer">
+  <input type="range" min="10" max="30" value="20" class="slider" id="fps" oninput="Func_fps()">
+<span id="val_fps"></div></td></tr>
+
+<tr><td>QUALITY</td><td><span id="sys_quality"></span></td><td><div class="slidecontainer">
+  <input type="range" min="10" max="50" value="10" class="slider" id="quality" oninput="Func_quality()">
+<span id="val_quality"></div></td></tr>
+
+<tr><td>VER_FLIP</td><td><span id="sys_vflip"></span></td><td><div class="slidecontainer">
+  <input type="range" min="1" max="2" value="1" class="slider" id="vflip" oninput="Func_vflip()">
+<span id="val_vflip"></div></td></tr></td></tr>
+<tr><td>HOR_FLIP</td><td><span id="sys_hflip"></span></td><td><div class="slidecontainer">
+  <input type="range" min="1" max="2" value="1" class="slider" id="hflip" oninput="Func_hflip()">
+<span id="val_hflip"></div></td></tr></td></tr>
+</table>
+<br>
+<a href="http://192.168.4.1/config">REFRESH_VALUE</a>
+<br>
+<form action ="http://192.168.4.1/flist"><input type="submit" value="FILE_MANAGER"></form>
+<br>
+<form action ="http://192.168.4.1/control"><input type="submit" value="CONTROL"></form>
+</body>
+</html>
