@@ -10,7 +10,7 @@
 
 #include "esp_system.h"
 
-esp_err_t camera_init();
+int camera_init();
 void camera_capture_task();
 int camera_capture();
 
