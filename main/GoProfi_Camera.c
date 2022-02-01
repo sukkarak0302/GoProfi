@@ -61,7 +61,7 @@ static clock_t ms_0;
 static clock_t ms_start;
 static clock_t ms_end;
 
-static int pic_delay_ms = 25;
+static int pic_delay_ms = 50;
 
 static FILE *f = NULL;
 static FILE *f_meta = NULL;
@@ -94,11 +94,11 @@ static camera_config_t camera_config = {
     .ledc_channel = LEDC_CHANNEL_0,
 
     .pixel_format = PIXFORMAT_JPEG,//YUV422,GRAYSCALE,RGB565,JPEG
-    .frame_size = FRAMESIZE_SVGA,//FRAMESIZE_QVGA,//FRAMESIZE_SXGA,//FRAMESIZE_SVGA,//FRAMESIZE_SVGA 12,//QQVGA-QXGA Do not use sizes above QVGA when not JPEG
+    .frame_size = FRAMESIZE_UXGA, //QQVGA-QXGA Do not use sizes above QVGA when not JPEG
 
     .jpeg_quality = 5, //0-63 lower number means higher quality
     .fb_count = 1, //if more than one, i2s runs in continuous mode. Use only with JPEG
-	.fb_location = CAMERA_FB_IN_DRAM,
+	.fb_location = CAMERA_FB_IN_PSRAM,
     .grab_mode = CAMERA_GRAB_WHEN_EMPTY //. Sets when buffers should be filled
 };
 
