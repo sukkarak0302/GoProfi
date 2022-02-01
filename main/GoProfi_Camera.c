@@ -20,6 +20,8 @@
 
 #include "esp_spiffs.h"
 
+#include "MainParameter.h"
+
 #include <math.h>
 
 #include <stdio.h>
@@ -61,7 +63,13 @@ static clock_t ms_0;
 static clock_t ms_start;
 static clock_t ms_end;
 
-static int pic_delay_ms = 50;
+// sd card space
+FATFS *fs;
+size_t fre_clust;
+size_t tot_sect;
+size_t fre_sect;
+
+static int pic_delay_ms = 150;
 
 static FILE *f = NULL;
 static FILE *f_meta = NULL;
@@ -135,8 +143,31 @@ void camera_capture_task()
 
 	ms_0 = clock();
 
+	if ( camera_filegen() == 1 )
+	{
 	while( 1 )
 	{
+		if ( cur_frame > 100 )
+		{
+			cur_frame = 1;
+			if( camera_fileclose() == 1 )
+			{
+				vTaskDelay(100);
+				if( camera_filegen() == 0 )
+				{
+					ret_val = -1;
+					break;
+				}
+			    f_getfree("0:", &fre_clust, &fs);
+			    fre_sect = (fre_clust * fs->csize);
+			    free_kb = fre_sect * fs->ssize / 1024;
+			    if ( free_kb <= RECORD_SAFE_FREE_SPACE )
+			    {
+			    	ret_val = -1;
+			    	break;
+			    }
+			}
+		}
 		ret_val = 0;
 		ms_start = clock();
 		if( f_close_complete >= 1 )
@@ -190,7 +221,8 @@ void camera_capture_task()
 				cur_frame++;
 			}
 			esp_camera_fb_return(fb);
-
+		}
+		int time_buf = ms_end - ms_start;
 #ifdef DEBUG
 	if (ret_val == 4)
 		ESP_LOGE(TAG,"mjpeg inconsistence");
@@ -206,10 +238,18 @@ void camera_capture_task()
 		ESP_LOGI(TAG,"frame %d!", cur_frame);
 		ESP_LOGI(TAG, "fps : %f", 1/((double)(ms_end-ms_start)/1000));
 	}
+	ESP_LOGI(TAG, "Time_Margin : %d", time_buf);
 #endif
-
+		if ( pic_delay_ms - time_buf > 0 )
+		{
+			vTaskDelay( (pic_delay_ms - time_buf) );
 		}
-		vTaskDelay(pic_delay_ms);
+	}
+
+	if ( ret_val == -1 )
+	{
+		esp_restart();
+	}
 	}
 }
 
@@ -301,12 +341,6 @@ esp_err_t init_sd()
 
     // Card has been initialized, print its properties
     sdmmc_card_print_info(stdout, card);
-
-    // sd card space
-    FATFS *fs;
-    size_t fre_clust;
-    size_t tot_sect;
-    size_t fre_sect;
 
     f_getfree("0:", &fre_clust, &fs);
     tot_sect = (fs->n_fatent -2) * fs->csize;
@@ -467,7 +501,12 @@ int cam_config_size(int val)
 				break;
 			default:
 				pic_size = FRAMESIZE_QVGA;
+				break;
 		}
+
+#ifdef DEBUG
+	ESP_LOGI(TAG, "Input image size : %d/ val : %d", pic_size, val);
+#endif
 		camera_config.frame_size = pic_size;
 		if ( esp_camera_init(&camera_config) == ESP_OK )
 			ret_val = pic_size;
@@ -544,21 +583,29 @@ int get_cam_config_size()
 	{
 		case 5 :
 			ret_val = 1;
+			break;
 		case 8 :
 			ret_val = 2;
+			break;
 		case 9 :
 			ret_val = 3;
+			break;
 		case 10 :
 			ret_val = 4;
+			break;
 		case 12 :
 			ret_val = 5;
+			break;
 		case 13 :
 			ret_val = 6;
+			break;
 		default :
 			ret_val = 1;
+			break;
 	}
 
 #ifdef DEBUG
+	ESP_LOGI(TAG, "Actual config frame_size : %d", camera_config.frame_size);
 	ESP_LOGI(TAG, "get_cam_config_size : %d", ret_val);
 #endif
 

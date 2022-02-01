@@ -157,14 +157,14 @@ int get_control(httpd_req_t *req)
 	memset(buf,0,buf_size);
 	sprintf(buf,"<html>\
 				<h1>CONTROL & CONFIG PAGE</h1>\
-				STATUS : %d <a href=\"http://192.168.4.1/control\">UPDATE</a>\
-				<br>CONTROL : \
-				<br><a href=\"http://192.168.4.1/control?req=rec\">RECORD</a>\
-				<br><a href=\"http://192.168.4.1/control?req=stop\">STOP_RECORD</a>\
-				<br>\
-				<br><a href=\"http://192.168.4.1/config\">CONFIG</a>\
-				<br><a href=\"http://192.168.4.1/flist\">FILE MANAGER</a>\
-				</html>", State_Read());
+				<br><h2>STATUS : %d <a href=\"http://192.168.4.1/control\">UPDATE</a>\
+				<br><br>CONTROL : \
+				<br><br><a href=\"http://192.168.4.1/control?req=rec\">RECORD</a>\
+				<br><br><a href=\"http://192.168.4.1/control?req=stop\">STOP_RECORD</a>\
+				<br><br>\
+				<br><br><a href=\"http://192.168.4.1/config\">CONFIG</a>\
+				<br><br><a href=\"http://192.168.4.1/flist\">FILE MANAGER</a>\
+				</h2></html>", State_Read());
 	httpd_resp_send_chunk(req, buf, buf_size);
 	httpd_resp_send_chunk(req, NULL, 0);
 
@@ -403,7 +403,16 @@ int get_config(httpd_req_t *req)
 
   			if( httpd_query_key_value(qur, "fps", c_fps, sizeof(c_fps)) == ESP_OK )
   			{
-  				if( cam_config_fps(charToInt(c_fps, 2)) != 0 ) ret_val = 1;
+  				if( c_fps[1] == '\0' )
+  				{
+  					c_fps[1] = c_fps[0];
+  					c_fps[0] = '0';
+  					c_fps[2] = '\0';
+  				}
+  				else
+  				{
+  					if( cam_config_fps(charToInt(c_fps, 2)) != 0 ) ret_val = 1;
+  				}
 
 #ifdef DEBUG
   	ESP_LOGI(LOG, "FPS : %d", ret_val);
@@ -412,7 +421,17 @@ int get_config(httpd_req_t *req)
 
   			if( httpd_query_key_value(qur, "quality", c_qly, sizeof(c_qly)) == ESP_OK )
   			{
-  				if( cam_config_quality(charToInt(c_qly, 2)) != 0 ) ret_val = 1;
+  				if( c_qly[1] == '\0')
+  				{
+  					c_qly[1] = c_qly[0];
+  					c_qly[0] = '0';
+  					c_qly[2] = '\0';
+  					if( cam_config_quality(charToInt(c_qly, 2)) != 0 ) ret_val = 1;
+  				}
+  				else
+  				{
+  					if( cam_config_quality(charToInt(c_qly, 2)) != 0 ) ret_val = 1;
+  				}
 #ifdef DEBUG
   	ESP_LOGI(LOG, "quality : %d", ret_val);
 #endif
@@ -442,10 +461,8 @@ int get_config(httpd_req_t *req)
     		  document.getElementById(\"sys_time2\").innerHTML = %d; \
     		  document.getElementById(\"sys_size\").innerHTML = %d; \
     		  document.getElementById(\"sys_fps\").innerHTML = %d; \
-    		  document.getElementById(\"sys_quality\").innerHTML = %d; \
-    		  document.getElementById(\"sys_vflip\").innerHTML = %d; \
-    		  document.getElementById(\"sys_hflip\").innerHTML = %d;}</script>", \
-			  sys_config.sys_time_1, sys_config.sys_time_2, sys_config.sys_size, sys_config.sys_fps, sys_config.sys_quality, sys_config.sys_vflip, sys_config.sys_hflip);
+    		  document.getElementById(\"sys_quality\").innerHTML = %d; \}</script>", \
+			  sys_config.sys_time_1, sys_config.sys_time_2, sys_config.sys_size, sys_config.sys_fps, sys_config.sys_quality);
     httpd_resp_send_chunk(req, buf, buf_size);
 
     memset(buf,0,buf_size);
@@ -582,6 +599,8 @@ int get_play(httpd_req_t *req)
 						}while(remainSize > 0);
 						httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
 					};
+					httpd_resp_send_chunk(req, NULL, 0);
+
 #ifdef DEBUG
 	ESP_LOGI(LOG, "Both file opened successfully!");
   	ESP_LOGI(LOG, "Query received %s", qur);

@@ -8,8 +8,7 @@ var val_dd = 01;
 var val_hh = 01;
 var val_mi = 01;
 var val_fps = 15;
-var val_vflip = 1;
-var val_hflip = 1;
+var sys_size;
 var tot_url;
 
 
@@ -96,26 +95,6 @@ function Func_fps(){
   xhttp.send(); 
 }
 
-function Func_vflip(){
-  var xhttp = new XMLHttpRequest();
-  val_vflip = document.getElementById("vflip").value;
-  document.getElementById("val_vflip").innerHTML = val_vflip;
-  
-  var url2 = url + "?vflip=" + val_vflip;
-  xhttp.open("GET", url2, true);
-  xhttp.send(); 
-}
-
-function Func_hflip(){
-  var xhttp = new XMLHttpRequest();
-  val_hflip = document.getElementById("hflip").value;
-  document.getElementById("val_hflip").innerHTML = val_hflip;
-  
-  var url2 = url + "?hflip=" + val_hflip;
-  xhttp.open("GET", url2, true);
-  xhttp.send(); 
-}
-
 function Func_quality(){
   var xhttp = new XMLHttpRequest();
   val_quality = document.getElementById("quality").value;
@@ -131,7 +110,7 @@ function Func_quality(){
 
 <html>
 <body onload="Func_initVal()">
-<h3>GO_PROFI</h3>
+<h1>GO_PROFI</h1>
 <h4>Configuration</h4>
 <table border=1>
 <tr><td>Config Name</td><td>System Value</td><td>Value</td></tr>
@@ -158,6 +137,9 @@ Result : <span id="val_year"></span>.<span id="val_month"></span>.<span id="val_
     <option value="1">QVGA(320X240)</option>
   <option value="2">VGA(640X480)</option>
   <option value="3">SVGA(800X600)</option>
+  <option value="4">XGA(1024x768)</option>
+  <option value="5">SXGA(1280x1024)</option>
+  <option value="6">UXGA(1600X1200)</option>
 </select></td></tr>
 
 <tr><td>FPS</td><td><span id="sys_fps"></span></td><td><div class="slidecontainer">
@@ -168,18 +150,12 @@ Result : <span id="val_year"></span>.<span id="val_month"></span>.<span id="val_
   <input type="range" min="3" max="50" value="10" class="slider" id="quality" oninput="Func_quality()">
 <span id="val_quality"></div></td></tr>
 
-<tr><td>VER_FLIP</td><td><span id="sys_vflip"></span></td><td><div class="slidecontainer">
-  <input type="range" min="1" max="2" value="1" class="slider" id="vflip" oninput="Func_vflip()">
-<span id="val_vflip"></div></td></tr></td></tr>
-<tr><td>HOR_FLIP</td><td><span id="sys_hflip"></span></td><td><div class="slidecontainer">
-  <input type="range" min="1" max="2" value="1" class="slider" id="hflip" oninput="Func_hflip()">
-<span id="val_hflip"></div></td></tr></td></tr>
 </table>
 <br>
-<a href="http://192.168.4.1/config">REFRESH_VALUE</a>
+<a href="http://192.168.4.1/config"><h2>REFRESH_VALUE</h2></a>
 <br>
-<form action ="http://192.168.4.1/flist"><input type="submit" value="FILE_MANAGER"></form>
+<a href="http://192.168.4.1/flist"><h2>FILE MANAGER</h2></a>
 <br>
-<form action ="http://192.168.4.1/control"><input type="submit" value="CONTROL"></form>
+<a href="http://192.168.4.1/control"><h2>CONTROL</h2></a>
 </body>
 </html>

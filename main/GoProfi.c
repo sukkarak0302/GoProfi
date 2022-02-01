@@ -81,7 +81,7 @@ void mainRoutine()
 					{
 						if ( camera_fileclose() == 0 )
 						{
-							State = 4;
+							State = 6;
 						}
 						vTaskDelete( camera_Handle );
 						camera_Handle = NULL;
@@ -104,7 +104,7 @@ void mainRoutine()
 					break;
 			}
 
-			if ( State >= 4 )
+			if ( State >= 5 )
 			{
 				esp_restart();
 			}
